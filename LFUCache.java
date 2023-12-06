@@ -45,26 +45,14 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         this.increasingOrderedFrequencyMap = new LinkedHashMap<>();
     }
 
-    public V get(Object key) {
-        if (hasTimedOut(key)) {
-            cache.remove(key);
-            return null;
-        }
-        return cache.get(key);
-    }
-
-    public boolean containsKey(Object key) {
-        if (hasTimedOut(key)) {
-            cache.remove(key);
-            return false;
-        }
-        return cache.containsKey(key);
-    }
-
     public void purgeInvalidEntries() {
 
     }
 
+    /*
+     * Note that this evaluates to false for a key that has already timed out
+     * and been removed from the cache
+     */
     private boolean hasTimedOut(Object key) {
         if (!insertionTimeOrderedTimestampMap.containsKey(key)) {
             return false;
