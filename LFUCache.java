@@ -11,7 +11,7 @@ import java.util.Set;
  * A least frequently used cache implementation. Insertion, retrieval, and removal are all constant time.
  */
 
-class LFUCache<K, V> extends AbstractMap<K, V> implements Map<K, V> {
+class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
     static final int DEFAULT_MAX_ENTRIES = 1024;
     static final long DEFAULT_INVALIDATION_TIMEOUT = 30; // seconds
 
