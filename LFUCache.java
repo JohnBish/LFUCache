@@ -13,34 +13,43 @@ import java.util.Set;
  */
 
 class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
-    static final int DEFAULT_MAX_ENTRIES = 1024;
-    static final long DEFAULT_INVALIDATION_TIMEOUT = 30; // seconds
+    private final int maxEntries;
+    private final long invalidationTimeout;
+    private final boolean greedyPurge;
+    private Map<K, V> cache;
+    private LinkedHashMap<K, LocalDateTime> insertionTimeOrderedTimestampMap;
+    private LinkedHashMap<K, MutableInteger> increasingOrderedFrequencyMap;
 
-    int maxEntries;
-    long invalidationTimeout;
-    Map<K, V> cache;
-    LinkedHashMap<K, LocalDateTime> insertionTimeOrderedTimestampMap;
-    LinkedHashMap<K, MutableInteger> increasingOrderedFrequencyMap;
+    public static class Builder {
+        // Optional params with defaults
+        private int maxEntries = 1024;
+        private long invalidationTimeout = 30;
+        private boolean greedyPurge = true;
 
-    LFUCache() {
-        this.maxEntries = DEFAULT_MAX_ENTRIES;
-        this.invalidationTimeout = DEFAULT_INVALIDATION_TIMEOUT;
-        this.cache = new HashMap<>();
-        this.insertionTimeOrderedTimestampMap = new LinkedHashMap<>();
-        this.increasingOrderedFrequencyMap = new LinkedHashMap<>();
+        public Builder maxEntries(int maxEntries) {
+            this.maxEntries = maxEntries;
+            return this;
+        }
+
+        public Builder invalidationTimeout(long invalidationTimeout) {
+            this.invalidationTimeout = invalidationTimeout;
+            return this;
+        }
+
+        public Builder greedyPurge(boolean greedyPurge) {
+            this.greedyPurge = greedyPurge;
+            return this;
+        }
+
+        public LFUCache build() {
+            return new LFUCache(this);
+        }
     }
 
-    LFUCache(int maxEntries) {
-        this.maxEntries = maxEntries;
-        this.invalidationTimeout = DEFAULT_INVALIDATION_TIMEOUT;
-        this.cache = new HashMap<>();
-        this.insertionTimeOrderedTimestampMap = new LinkedHashMap<>();
-        this.increasingOrderedFrequencyMap = new LinkedHashMap<>();
-    }
-
-    LFUCache(int maxEntries, long invalidationTimeout) {
-        this.maxEntries = maxEntries;
-        this.invalidationTimeout = invalidationTimeout;
+    private LFUCache(Builder builder) {
+        this.maxEntries = builder.maxEntries;
+        this.invalidationTimeout = builder.invalidationTimeout;
+        this.greedyPurge = builder.greedyPurge;
         this.cache = new HashMap<>();
         this.insertionTimeOrderedTimestampMap = new LinkedHashMap<>();
         this.increasingOrderedFrequencyMap = new LinkedHashMap<>();
