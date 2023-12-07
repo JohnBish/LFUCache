@@ -57,7 +57,9 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
 
     @Override
     public V get(Object key) {
-        purgeInvalidEntries();
+        if (greedyPurge) {
+            purgeInvalidEntries();
+        }
 
         if (increasingOrderedFrequencyMap.containsKey(key)) {
             /*
@@ -99,7 +101,9 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
      */
     @Override
     public Set entrySet() {
-        purgeInvalidEntries();
+        if (greedyPurge) {
+            purgeInvalidEntries();
+        }
         /*
          * 'Unchecked' cast. We, the developer, know that cache is also a
          * Map<K, V>.
