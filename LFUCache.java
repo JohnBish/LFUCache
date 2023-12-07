@@ -16,7 +16,7 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
     private final int maxEntries;
     private final long invalidationTimeout;
     private final boolean greedyPurge;
-    private Map<K, V> cache;
+    private HashMap<K, V> cache;
     private LinkedHashMap<K, LocalDateTime> insertionTimeOrderedTimestampMap;
     private LinkedHashMap<K, MutableInteger> increasingOrderedFrequencyMap;
 
@@ -57,8 +57,8 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
 
     @Override
     public V get(Object key) {
-        if (greedyPurge) {
-            purgeInvalidEntries();
+        if (hasTimedOut(key)) {
+            this.remove(key);
         }
 
         if (increasingOrderedFrequencyMap.containsKey(key)) {
@@ -66,16 +66,13 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
              * The reason increasingOrderedFrequencyMap's values must be 
              * mutable is below: since key is not necessarily of type K (but
              * possibly equal to a K), there is no way to call put(),
-             * computeIfPresent(), etc.
+             * computeIfPresent(), etc. from this method and it would be wrong
+             * to do so with a checked cast.
              */
             increasingOrderedFrequencyMap.get(key).incrementValue();
         }
 
         return cache.get(key);
-    }
-
-    public void purgeInvalidEntries() {
-
     }
 
     /*
@@ -95,8 +92,34 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         }
     }
 
+    /*
+     * Called frequently enough, this should be a cheap operation.
+     * Occasionally, a put() may be called after a long period of inactivity.
+     * If the cache is very large and completely invalid we may have to traverse
+     * the entire thing. This can be mitigated by disabling greedyPurge and
+     * scheduling periodic purges instead.
+     */
+    private void purgeInvalidEntries() {
+        // Guaranteed to be in insertion order
+        for (K timestampKey: insertionTimeOrderedTimestampMap.keySet()) {
+            if (hasTimedOut(timestampKey)) {
+                this.remove(timestampKey);
+            } else {
+                // All further entries are valid
+                break;
+            }
+        }
+    }
+
+    @Override
+    public V remove(Object key) {
+        insertionTimeOrderedTimestampMap.remove(key);
+        increasingOrderedFrequencyMap.remove(key);
+        return cache.remove(key);
+    }
+
     /* 
-     * Usage of entrySet() is assumed to not directly change the relative
+     * Client usage of entrySet() is assumed to not directly change the relative
      * frequencies; only direct (or indirect) usage of get() should do this.
      */
     @Override
