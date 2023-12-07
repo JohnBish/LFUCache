@@ -100,14 +100,11 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
      * frequencies; only direct (or indirect) usage of get() should do this.
      */
     @Override
-    public Set entrySet() {
+    public Set<Map.Entry<K, V>> entrySet() {
         if (greedyPurge) {
             purgeInvalidEntries();
         }
-        /*
-         * 'Unchecked' cast. We, the developer, know that cache is also a
-         * Map<K, V>.
-         */
+
         return cache.entrySet();
     }
 }
