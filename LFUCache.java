@@ -8,7 +8,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A least frequently used cache implementation. Insertion, retrieval, and removal are all constant time.
+ * A least frequently used cache implementation. Insertion, retrieval, and
+ * removal are all constant time.
  */
 
 class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
@@ -19,7 +20,7 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
     long invalidationTimeout;
     Map<K, V> cache;
     LinkedHashMap<K, LocalDateTime> insertionTimeOrderedTimestampMap;
-    LinkedHashMap<K, Integer> increasingOrderedFrequencyMap;
+    LinkedHashMap<K, MutableInteger> increasingOrderedFrequencyMap;
 
     LFUCache() {
         this.maxEntries = DEFAULT_MAX_ENTRIES;
@@ -45,6 +46,23 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         this.increasingOrderedFrequencyMap = new LinkedHashMap<>();
     }
 
+    @Override
+    public V get(Object key) {
+        purgeInvalidEntries();
+
+        if (increasingOrderedFrequencyMap.containsKey(key)) {
+            /*
+             * The reason increasingOrderedFrequencyMap's values must be 
+             * mutable is below: since key is not necessarily of type K (but
+             * possibly equal to a K), there is no way to call put(),
+             * computeIfPresent(), etc.
+             */
+            increasingOrderedFrequencyMap.get(key).incrementValue();
+        }
+
+        return cache.get(key);
+    }
+
     public void purgeInvalidEntries() {
 
     }
@@ -66,10 +84,17 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         }
     }
 
-    // Usage of entrySet (e.g. by AbstractMap) is assumed to not change the relative frequencies
+    /* 
+     * Usage of entrySet() is assumed to not directly change the relative
+     * frequencies; only direct (or indirect) usage of get() should do this.
+     */
     @Override
     public Set entrySet() {
         purgeInvalidEntries();
+        /*
+         * 'Unchecked' cast. We, the developer, know that cache is also a
+         * Map<K, V>.
+         */
         return cache.entrySet();
     }
 }
