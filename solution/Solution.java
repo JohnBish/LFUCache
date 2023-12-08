@@ -15,7 +15,9 @@ class Solution {
     // Tests
 
     public static void insertEntries_success() {
-        LFUCache<Integer, Integer> cache = new LFUCache().withMaxEntries(10);
+        // Sadly, the fluent inteface precludes type inference
+        Cache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
+            .withMaxEntries(10);
 
         for (int i = 0; i < 10; i++) {
             cache.put(i, i*i);
@@ -27,7 +29,8 @@ class Solution {
     }
 
     public static void insertEntries_hasMax() {
-        LFUCache<Integer, Integer> cache = new LFUCache().withMaxEntries(10);
+        LFUCache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
+            .withMaxEntries(10);
 
         for (int i = 0; i < 11; i++) {
             cache.put(i, i*i);
@@ -37,7 +40,8 @@ class Solution {
     }
 
     public static void insertMax_removesLeastFrequent() {
-        LFUCache<Integer, Integer> cache = new LFUCache().withMaxEntries(17);
+        LFUCache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
+            .withMaxEntries(17);
 
         for (int i = 0; i < 17; i++) {
             cache.put(i, i*i);
@@ -76,7 +80,7 @@ class Solution {
 
     public static void insertAndRetrieveMillionRandomEntries_success() {
         // Default max size of 1024
-        LFUCache<Integer, Integer> cache = new LFUCache();
+        LFUCache<Integer, Integer> cache = new LFUCache<>();
 
         for (int i = 0; i < 1_000_000; i++) {
             cache.put(
@@ -91,7 +95,8 @@ class Solution {
     }
 
     public static void timedoutEntries_removed() throws InterruptedException {
-        LFUCache<Integer, Integer> cache = new LFUCache().withInvalidationTimeout(1);
+        LFUCache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
+            .withInvalidationTimeout(1);
 
         for (int i = 0; i < 10; i++) {
             cache.put(i, i*i);
