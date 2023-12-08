@@ -214,8 +214,12 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         return frequencyListHead.toString();
     }
 
-    public String getFrequencyCounts() {
-        return frequencyListHead.frequencyCounts();
+    public String getFrequencyCountsRepr() {
+        return frequencyListHead.frequencyCountsRepr();
+    }
+
+    public int getTotalFrequencyCounts() {
+        return frequencyListHead.totalFrequencyCounts();
     }
 
     /*
@@ -322,7 +326,21 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
             }
         }
 
-        public String frequencyCounts() {
+        public int totalFrequencyCounts() {
+            if (prev == null) {
+                if (next == null) {
+                    return keySet.size();
+                } else {
+                    return keySet.size() + next.totalFrequencyCounts();
+                }
+            } else if (next == null) {
+                return keySet.size();
+            } else {
+                return keySet.size() + next.totalFrequencyCounts();
+            }
+        }
+
+        public String frequencyCountsRepr() {
             if (prev == null) {
                 if (next == null) {
                     return "{"
@@ -336,7 +354,7 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
                         + ": "
                         + keySet.size()
                         + ", "
-                        + next.frequencyCounts();
+                        + next.frequencyCountsRepr();
                 }
             } else if (next == null) {
                 return frequency
@@ -348,7 +366,7 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
                     + ": "
                     + keySet.size()
                     + ", "
-                    + next.frequencyCounts();
+                    + next.frequencyCountsRepr();
             }
         }
     }

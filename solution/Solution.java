@@ -92,7 +92,8 @@ class Solution {
         }
 
         assert(cache.size() == 1024);
-        // System.out.println(cache.getFrequencyCounts());
+        // System.out.println(cache.getFrequencyCountsRepr());
+        assert(cache.getTotalFrequencyCounts() == 1024);
     }
 
     private static void timedoutEntries_removed() throws InterruptedException {
