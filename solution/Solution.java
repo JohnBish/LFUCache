@@ -4,6 +4,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 class Solution {
     public static void main(String[] args) throws InterruptedException {
+        // Tests
         insertEntries_success();
         insertEntries_hasMax();
         insertMax_removesLeastFrequent();
@@ -11,9 +12,6 @@ class Solution {
         timedoutEntries_removed();
         noGreedyPurge_timedoutEntries_notRemoved();
     }
-
-
-    // Tests
 
     private static void insertEntries_success() {
         // Sadly, the fluent inteface precludes type inference
