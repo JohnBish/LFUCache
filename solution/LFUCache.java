@@ -176,7 +176,7 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
      * the entire thing. This can be mitigated by disabling greedyPurge and
      * scheduling periodic purges instead.
      */
-    private void purgeInvalidEntries() {
+    public void purgeInvalidEntries() {
         // Guaranteed to be in insertion order
         for (K timestampKey: insertionTimeOrderedTimestampMap.keySet()) {
             if (hasTimedOut(timestampKey)) {
