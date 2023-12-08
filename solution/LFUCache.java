@@ -116,24 +116,24 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
              * than the old. Otherwise, insert a new one.
              */
             if (next == null) {
-                current.setNext(new FrequencyEquivalenceNode(currentFreq + 1));
-                current.getNext().setPrev(current);
-                current.getNext().addKey(key);
-                increasingOrderedFrequencyListMap.put(key, current.getNext());
-                current.removeKey(key);
+                FrequencyEquivalenceNode newNode
+                    = new FrequencyEquivalenceNode(currentFreq + 1);
+                current.setNext(newNode);
+                newNode.setPrev(current);
+                newNode.addKey(key);
             } else if (next.getFrequency() == currentFreq + 1) {
                 current.getNext().addKey(key);
-                increasingOrderedFrequencyListMap.put(key, current.getNext());
-                current.removeKey(key);
             } else {
-                current.setNext(new FrequencyEquivalenceNode(currentFreq + 1));
-                current.getNext().setPrev(current);
-                current.getNext().setNext(next);
+                FrequencyEquivalenceNode newNode
+                    = new FrequencyEquivalenceNode(currentFreq + 1);
+                current.setNext(newNode);
+                newNode.setPrev(current);
+                newNode.setNext(next);
                 next.setPrev(current.getNext());
-                current.getNext().addKey(key);
-                increasingOrderedFrequencyListMap.put(key, current.getNext());
-                current.removeKey(key);
+                newNode.addKey(key);
             }
+            increasingOrderedFrequencyListMap.put(key, current.getNext());
+            current.removeKey(key);
         }
     }
 
