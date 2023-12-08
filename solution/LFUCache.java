@@ -118,6 +118,12 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         return cache.put(key, value);
     }
 
+    // Override inefficient AbstractMap implementation
+    @Override
+    public boolean containsKey(Object key) {
+        return cache.containsKey(key);
+    }
+
     private void incrementFrequency(Object key) {
         if (increasingOrderedFrequencyListMap.containsKey(key)) {
             FrequencyEquivalenceNode current = increasingOrderedFrequencyListMap.get(key);
