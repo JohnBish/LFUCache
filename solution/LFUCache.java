@@ -1,3 +1,5 @@
+package solution;
+
 import java.time.LocalDateTime;
 import java.util.AbstractMap;
 import java.util.HashMap;
@@ -78,17 +80,24 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
             purgeInvalidEntries();
         }
 
-        if (cache.size() >= maxEntries - 1) {
-            K toRemove;
-            if (frequencyListHead.isEmpty()) {
-                toRemove = frequencyListHead
-                    .getNext()
-                    .getAndRemoveFirstKey();
-            } else {
-                toRemove = frequencyListHead.getAndRemoveFirstKey();
-            }
+        if (increasingOrderedFrequencyListMap.containsKey(key)) {
+            increasingOrderedFrequencyListMap
+                .get(key)
+                .removeKey(key);
+            increasingOrderedFrequencyListMap.remove(key);
+        } else {
+            if (cache.size() >= maxEntries) {
+                K toRemove;
+                if (frequencyListHead.isEmpty()) {
+                    toRemove = frequencyListHead
+                        .getNext()
+                        .getFirstKey();
+                } else {
+                    toRemove = frequencyListHead.getFirstKey();
+                }
 
-            this.remove(toRemove);
+                this.remove(toRemove);
+            }
         }
 
         insertionTimeOrderedTimestampMap.put(key, LocalDateTime.now());
@@ -99,40 +108,32 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
 
     private void incrementFrequency(K key) {
         if (increasingOrderedFrequencyListMap.containsKey(key)) {
-            FrequencyEquivalenceNode oldFrequencyNode =
-                increasingOrderedFrequencyListMap.get(key);
-            int oldFrequency = oldFrequencyNode.getFrequency();
-            FrequencyEquivalenceNode nextFrequencyNode =
-                oldFrequencyNode.getNext();
+            FrequencyEquivalenceNode current = increasingOrderedFrequencyListMap.get(key);
+            int currentFreq = current.getFrequency();
+            FrequencyEquivalenceNode next = current.getNext();
 
             /* Make sure nextFrequencyNode has a frequency of 1 higher
              * than the old. Otherwise, insert a new one.
              */
-            if (nextFrequencyNode == null) {
-                FrequencyEquivalenceNode newFrequencyNode =
-                    new FrequencyEquivalenceNode(oldFrequency + 1);
-                oldFrequencyNode.setNext(newFrequencyNode);
-                newFrequencyNode.setPrev(oldFrequencyNode);
-                nextFrequencyNode = newFrequencyNode;
-            } else if (nextFrequencyNode.getFrequency() != oldFrequency + 1) {
-                FrequencyEquivalenceNode newFrequencyNode =
-                    new FrequencyEquivalenceNode(oldFrequency + 1);
-                oldFrequencyNode.setNext(newFrequencyNode);
-                newFrequencyNode.setPrev(oldFrequencyNode);
-                newFrequencyNode.setNext(nextFrequencyNode);
-                nextFrequencyNode.setPrev(oldFrequencyNode);
-                nextFrequencyNode = newFrequencyNode;
+            if (next == null) {
+                current.setNext(new FrequencyEquivalenceNode(currentFreq + 1));
+                current.getNext().setPrev(current);
+                current.getNext().addKey(key);
+                increasingOrderedFrequencyListMap.put(key, current.getNext());
+                current.removeKey(key);
+            } else if (next.getFrequency() == currentFreq + 1) {
+                current.getNext().addKey(key);
+                increasingOrderedFrequencyListMap.put(key, current.getNext());
+                current.removeKey(key);
+            } else {
+                current.setNext(new FrequencyEquivalenceNode(currentFreq + 1));
+                current.getNext().setPrev(current);
+                current.getNext().setNext(next);
+                next.setPrev(current.getNext());
+                current.getNext().addKey(key);
+                increasingOrderedFrequencyListMap.put(key, current.getNext());
+                current.removeKey(key);
             }
-
-            nextFrequencyNode.addKey(key);
-            // Automatically relinked if drops to 0
-            oldFrequencyNode.removeKey(key);
-            nextFrequencyNode.addKey(key);
-            increasingOrderedFrequencyListMap
-                .put(key, nextFrequencyNode);
-        } else {
-            System.out.println("WARNING: incrementFrequency called with invalid"
-                + " key " + key);
         }
     }
 
@@ -146,7 +147,8 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         }
 
         LocalDateTime insertionTime = insertionTimeOrderedTimestampMap.get(key);
-        if (insertionTime.plusSeconds(invalidationTimeout).isAfter(LocalDateTime.now())) {
+        if (insertionTime.plusSeconds(invalidationTimeout).isBefore(LocalDateTime.now())) {
+            // System.out.println("Invalid key detected; removing");
             return true;
         } else {
             return false;
@@ -193,6 +195,14 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         return cache.entrySet();
     }
 
+    public String getFrequenciesRepr() {
+        return frequencyListHead.toString();
+    }
+
+    public String getFrequencyCounts() {
+        return frequencyListHead.frequencyCounts();
+    }
+
     /*
     * A node representing a set of values of equivalent frequency in a linked
     * list. Automatically links neighbours if there are no more values with
@@ -219,7 +229,7 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
 
         public void removeKey(K key) {
             keySet.remove(key);
-            if (keySet.isEmpty()) {
+            if (isEmpty()) {
                 /*
                  * Remove this node from the linked list and link neighbours if
                  * they exist, UNLESS this is head
@@ -236,13 +246,11 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
             }
         }
 
-        public K getAndRemoveFirstKey() {
-            if (keySet.isEmpty()) {
+        public K getFirstKey() {
+            if (isEmpty()) {
                 return null;
             }
-            K firstKey = keySet.iterator().next();
-            keySet.remove(firstKey);
-            return firstKey;
+            return keySet.iterator().next();
         }
 
         public boolean isEmpty() {
@@ -269,21 +277,62 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         public String toString() {
             if (prev == null) {
                 if (next == null) {
-                    return "[]";
+                    return "{"
+                        + frequency
+                        + ": "
+                        + keySet.toString()
+                        + "}";
                 } else {
-                    return "[" + next.toString();
+                    return "{"
+                        + frequency
+                        + ": "
+                        + keySet.toString()
+                        + ", "
+                        + next.toString();
                 }
             } else if (next == null) {
                 return frequency
-                    + ": {"
+                    + ": "
                     + keySet.toString()
-                    + "}]";
+                    + "}";
             } else {
                 return frequency
-                    + ": {"
+                    + ": "
                     + keySet.toString()
-                    + "}, ";
+                    + ", "
+                    + next.toString();
+            }
+        }
+
+        public String frequencyCounts() {
+            if (prev == null) {
+                if (next == null) {
+                    return "{"
+                        + frequency
+                        + ": "
+                        + keySet.size()
+                        + "}";
+                } else {
+                    return "{"
+                        + frequency
+                        + ": "
+                        + keySet.size()
+                        + ", "
+                        + next.frequencyCounts();
+                }
+            } else if (next == null) {
+                return frequency
+                    + ": "
+                    + keySet.size()
+                    + "}";
+            } else {
+                return frequency
+                    + ": "
+                    + keySet.size()
+                    + ", "
+                    + next.frequencyCounts();
             }
         }
     }
 }
+
