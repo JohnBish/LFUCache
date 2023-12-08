@@ -2,6 +2,7 @@ import java.time.LocalDateTime;
 import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -9,22 +10,25 @@ import java.util.Set;
 
 /**
  * A least frequently used cache implementation. Insertion, retrieval, and
- * removal are all constant time.
+ * removal are constant time.
  */
 
 class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
     private final int maxEntries;
     private final long invalidationTimeout;
     private final boolean greedyPurge;
-    private HashMap<K, V> cache;
+    private Map<K, V> cache;
     private LinkedHashMap<K, LocalDateTime> insertionTimeOrderedTimestampMap;
-    private LinkedHashMap<K, MutableInteger> increasingOrderedFrequencyMap;
+    private Map<K, FrequencyEquivalenceNode> increasingOrderedFrequencyListMap;
+    private FrequencyEquivalenceNode frequencyListHead;
 
     public static class Builder {
         // Optional params with defaults
         private int maxEntries = 1024;
         private long invalidationTimeout = 30;
         private boolean greedyPurge = true;
+
+        public Builder() { }
 
         public Builder maxEntries(int maxEntries) {
             this.maxEntries = maxEntries;
@@ -52,7 +56,8 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         this.greedyPurge = builder.greedyPurge;
         this.cache = new HashMap<>();
         this.insertionTimeOrderedTimestampMap = new LinkedHashMap<>();
-        this.increasingOrderedFrequencyMap = new LinkedHashMap<>();
+        this.increasingOrderedFrequencyListMap = new HashMap<>();
+        this.frequencyListHead = new FrequencyEquivalenceNode(1);
     }
 
     @Override
@@ -61,18 +66,74 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
             this.remove(key);
         }
 
-        if (increasingOrderedFrequencyMap.containsKey(key)) {
-            /*
-             * The reason increasingOrderedFrequencyMap's values must be 
-             * mutable is below: since key is not necessarily of type K (but
-             * possibly equal to a K), there is no way to call put(),
-             * computeIfPresent(), etc. from this method and it would be wrong
-             * to do so with a checked cast.
-             */
-            increasingOrderedFrequencyMap.get(key).incrementValue();
-        }
+        incrementFrequency((K) key);
 
         return cache.get(key);
+    }
+
+    @Override
+    public V put(K key, V value) {
+        if (greedyPurge) {
+            // Free up as much space as possible before deleting valid entries
+            purgeInvalidEntries();
+        }
+
+        if (cache.size() >= maxEntries - 1) {
+            K toRemove;
+            if (frequencyListHead.isEmpty()) {
+                toRemove = frequencyListHead
+                    .getNext()
+                    .getAndRemoveFirstKey();
+            } else {
+                toRemove = frequencyListHead.getAndRemoveFirstKey();
+            }
+
+            this.remove(toRemove);
+        }
+
+        insertionTimeOrderedTimestampMap.put(key, LocalDateTime.now());
+        increasingOrderedFrequencyListMap.put(key, frequencyListHead);
+        frequencyListHead.addKey(key);
+        return cache.put(key, value);
+    }
+
+    private void incrementFrequency(K key) {
+        if (increasingOrderedFrequencyListMap.containsKey(key)) {
+            FrequencyEquivalenceNode oldFrequencyNode =
+                increasingOrderedFrequencyListMap.get(key);
+            int oldFrequency = oldFrequencyNode.getFrequency();
+            FrequencyEquivalenceNode nextFrequencyNode =
+                oldFrequencyNode.getNext();
+
+            /* Make sure nextFrequencyNode has a frequency of 1 higher
+             * than the old. Otherwise, insert a new one.
+             */
+            if (nextFrequencyNode == null) {
+                FrequencyEquivalenceNode newFrequencyNode =
+                    new FrequencyEquivalenceNode(oldFrequency + 1);
+                oldFrequencyNode.setNext(newFrequencyNode);
+                newFrequencyNode.setPrev(oldFrequencyNode);
+                nextFrequencyNode = newFrequencyNode;
+            } else if (nextFrequencyNode.getFrequency() != oldFrequency + 1) {
+                FrequencyEquivalenceNode newFrequencyNode =
+                    new FrequencyEquivalenceNode(oldFrequency + 1);
+                oldFrequencyNode.setNext(newFrequencyNode);
+                newFrequencyNode.setPrev(oldFrequencyNode);
+                newFrequencyNode.setNext(nextFrequencyNode);
+                nextFrequencyNode.setPrev(oldFrequencyNode);
+                nextFrequencyNode = newFrequencyNode;
+            }
+
+            nextFrequencyNode.addKey(key);
+            // Automatically relinked if drops to 0
+            oldFrequencyNode.removeKey(key);
+            nextFrequencyNode.addKey(key);
+            increasingOrderedFrequencyListMap
+                .put(key, nextFrequencyNode);
+        } else {
+            System.out.println("WARNING: incrementFrequency called with invalid"
+                + " key " + key);
+        }
     }
 
     /*
@@ -114,7 +175,8 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
     @Override
     public V remove(Object key) {
         insertionTimeOrderedTimestampMap.remove(key);
-        increasingOrderedFrequencyMap.remove(key);
+        increasingOrderedFrequencyListMap.get(key).removeKey((K) key);
+        increasingOrderedFrequencyListMap.remove(key);
         return cache.remove(key);
     }
 
@@ -129,5 +191,99 @@ class LFUCache<K, V> extends AbstractMap<K, V> implements Cache<K, V> {
         }
 
         return cache.entrySet();
+    }
+
+    /*
+    * A node representing a set of values of equivalent frequency in a linked
+    * list. Automatically links neighbours if there are no more values with
+    * this frequency, but never removes head node with frequency 1.
+    */
+    private class FrequencyEquivalenceNode {
+        private int frequency;
+        private Set<K> keySet;
+        private FrequencyEquivalenceNode prev;
+        private FrequencyEquivalenceNode next;
+
+        FrequencyEquivalenceNode(int frequency) {
+            this.frequency = frequency;
+            this.keySet = new LinkedHashSet<>();
+        }
+
+        public int getFrequency() {
+            return frequency;
+        }
+
+        public void addKey(K key) {
+            keySet.add(key);
+        }
+
+        public void removeKey(K key) {
+            keySet.remove(key);
+            if (keySet.isEmpty()) {
+                /*
+                 * Remove this node from the linked list and link neighbours if
+                 * they exist, UNLESS this is head
+                 */
+                if (prev != null) {
+                    prev.setNext(next);
+                } else {
+                    return;
+                }
+
+                if (next != null) {
+                    next.setPrev(prev);
+                }
+            }
+        }
+
+        public K getAndRemoveFirstKey() {
+            if (keySet.isEmpty()) {
+                return null;
+            }
+            K firstKey = keySet.iterator().next();
+            keySet.remove(firstKey);
+            return firstKey;
+        }
+
+        public boolean isEmpty() {
+            return keySet.isEmpty();
+        }
+
+        public FrequencyEquivalenceNode getPrev() {
+            return prev;
+        }
+
+        public void setPrev(FrequencyEquivalenceNode prev) {
+            this.prev = prev;
+        }
+
+        public FrequencyEquivalenceNode getNext() {
+            return next;
+        }
+
+        public void setNext(FrequencyEquivalenceNode next) {
+            this.next = next;
+        }
+
+        @Override
+        public String toString() {
+            if (prev == null) {
+                if (next == null) {
+                    return "[]";
+                } else {
+                    return "[" + next.toString();
+                }
+            } else if (next == null) {
+                return frequency
+                    + ": {"
+                    + keySet.toString()
+                    + "}]";
+            } else {
+                return frequency
+                    + ": {"
+                    + keySet.toString()
+                    + "}, ";
+            }
+        }
     }
 }
