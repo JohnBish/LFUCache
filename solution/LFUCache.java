@@ -24,7 +24,7 @@ import java.util.Set;
  * attempted retrieval - thus, unless scheduled {@code purgeInvalidEntries()}
  * are performed, they will build up in the cache.
  *
- * Fast insertion is performed using a Map between Ks (or equivalent) and
+ * Fast retrieval is performed using a Map between Ks (or equivalent) and
  * doubly-linked nodes containing the corresponding frequency and a Set of Ks
  * with that frequency. When a K increases in frequency, it moves one node
  * forward (possibly creating a new one). Nodes with an empty set of Ks are
