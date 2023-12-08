@@ -9,12 +9,13 @@ class Solution {
         insertMax_removesLeastFrequent();
         insertAndRetrieveMillionRandomEntries_success();
         timedoutEntries_removed();
+        noGreedyPurge_timedoutEntries_notRemoved();
     }
 
 
     // Tests
 
-    public static void insertEntries_success() {
+    private static void insertEntries_success() {
         // Sadly, the fluent inteface precludes type inference
         Cache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
             .withMaxEntries(10);
@@ -28,7 +29,7 @@ class Solution {
         }
     }
 
-    public static void insertEntries_hasMax() {
+    private static void insertEntries_hasMax() {
         LFUCache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
             .withMaxEntries(10);
 
@@ -39,7 +40,7 @@ class Solution {
         assert(cache.size() == 10);
     }
 
-    public static void insertMax_removesLeastFrequent() {
+    private static void insertMax_removesLeastFrequent() {
         LFUCache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
             .withMaxEntries(17);
 
@@ -78,7 +79,7 @@ class Solution {
         assert(cache.get(23) == 100007);
     }
 
-    public static void insertAndRetrieveMillionRandomEntries_success() {
+    private static void insertAndRetrieveMillionRandomEntries_success() {
         // Default max size of 1024
         LFUCache<Integer, Integer> cache = new LFUCache<>();
 
@@ -91,10 +92,10 @@ class Solution {
         }
 
         assert(cache.size() == 1024);
-        System.out.println(cache.getFrequencyCounts());
+        // System.out.println(cache.getFrequencyCounts());
     }
 
-    public static void timedoutEntries_removed() throws InterruptedException {
+    private static void timedoutEntries_removed() throws InterruptedException {
         LFUCache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
             .withInvalidationTimeout(1);
 
@@ -112,6 +113,22 @@ class Solution {
         }
         for (int i = 10; i < 20; i++) {
             assert(cache.get(i) == i*i);
+        }
+    }
+
+    private static void noGreedyPurge_timedoutEntries_notRemoved() throws InterruptedException {
+        LFUCache<Integer, Integer> cache = new LFUCache<Integer, Integer>()
+            .withInvalidationTimeout(1)
+            .withGreedyPurge(false);
+
+        for (int i = 0; i < 10; i++) {
+            cache.put(i, i*i);
+        }
+        Thread.sleep(1200);
+        assert(cache.keySet().size() == 10);
+        // Explicit gets still remove invalid elements
+        for (int i = 0; i < 10; i++) {
+            assert(cache.get(i) == null);
         }
     }
 }
